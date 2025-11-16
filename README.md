@@ -4,10 +4,10 @@ Open-source SBOM generator with license policy enforcement.
 
 ## Quick Start
 
-\`\`\`bash
+```bash
 npm install -g clearbom
 clearbom scan --path ./my-project
-\`\`\`
+```
 
 ## Features
 
