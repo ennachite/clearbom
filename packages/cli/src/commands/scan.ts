@@ -1,4 +1,5 @@
 import { writeFile } from "node:fs/promises";
+import { isAbsolute, join, resolve } from "node:path";
 import { Logger } from "../utils/logger.js";
 import { scanRepository } from "../scanners/repo.js";
 import { categorizeLicense, extractLicenseId } from "../utils/license.js";
@@ -16,17 +17,20 @@ export async function scanCommand(options: ScanOptions) {
     }
 
     // Generate SBOM
-    logger.info(`Scanning repository at ${options.path}`);
-    const sbom = await scanRepository(options.path);
+    const targetPath = resolve(options.path ?? ".");
+    logger.info(`Scanning repository at ${targetPath}`);
+    const sbom = await scanRepository(targetPath);
 
     // Write SBOM
-    await writeFile(options.output, JSON.stringify(sbom, null, 2));
-    logger.success(`SBOM written to ${options.output}`);
+    const outputPath = resolveOutputPath(options.output, targetPath);
+    await writeFile(outputPath, JSON.stringify(sbom, null, 2));
+    logger.success(`SBOM written to ${outputPath}`);
 
     // Generate summary
     const summary = generateSummary(sbom);
-    await writeFile(options.summary, JSON.stringify(summary, null, 2));
-    logger.success(`Summary written to ${options.summary}`);
+    const summaryPath = resolveOutputPath(options.summary, targetPath);
+    await writeFile(summaryPath, JSON.stringify(summary, null, 2));
+    logger.success(`Summary written to ${summaryPath}`);
 
     // Display results
     displaySummary(summary, logger);
@@ -72,4 +76,8 @@ function displaySummary(summary: Summary, logger: Logger) {
   logger.info(`     Copyleft: ${summary.licenses.copyleft}`);
   logger.info(`     Proprietary: ${summary.licenses.proprietary}`);
   logger.info(`     Unknown: ${summary.licenses.unknown}`);
+}
+
+function resolveOutputPath(path: string, basePath: string) {
+  return isAbsolute(path) ? path : join(basePath, path);
 }
