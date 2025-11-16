@@ -1,10 +1,10 @@
 {
   "bomFormat": "CycloneDX",
   "specVersion": "1.6",
-  "serialNumber": "urn:uuid:15adc986-5399-4fe1-b482-44728c3a2c50",
+  "serialNumber": "urn:uuid:790249b7-de51-4a83-a999-6d6df6986dad",
   "version": 1,
   "metadata": {
-    "timestamp": "2025-11-16T22:05:58Z",
+    "timestamp": "2025-11-16T22:15:00Z",
     "tools": {
       "components": [
         {
@@ -4224,7 +4224,7 @@
           ]
         }
       },
-      "timestamp": "2025-11-16T22:05:58Z",
+      "timestamp": "2025-11-16T22:15:00Z",
       "text": "This Software Bill-of-Materials (SBOM) document was created on Sunday, November 16, 2025 with cdxgen. The data was captured during the build lifecycle phase. The document describes an application named 'test-app' with version '1.0.0'. There are 71 components."
     }
   ]

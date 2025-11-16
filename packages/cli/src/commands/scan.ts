@@ -3,6 +3,8 @@ import { isAbsolute, join, resolve } from "node:path";
 import { Logger } from "../utils/logger.js";
 import { scanRepository } from "../scanners/repo.js";
 import { categorizeLicense, extractLicenseId } from "../utils/license.js";
+import { loadPolicy } from "../policy/parser.js";
+import { validatePolicy } from "../policy/validator.js";
 import type { ScanOptions, Summary } from "../types.js";
 
 export async function scanCommand(options: ScanOptions) {
@@ -26,14 +28,37 @@ export async function scanCommand(options: ScanOptions) {
     await writeFile(outputPath, JSON.stringify(sbom, null, 2));
     logger.success(`SBOM written to ${outputPath}`);
 
+    // Load policy
+    const policy = await loadPolicy(options.policy);
+    let violations: any[] = [];
+
+    if (policy) {
+      logger.info(`Validating against policy: ${options.policy}`);
+      violations = validatePolicy(sbom, policy);
+    }
+
     // Generate summary
-    const summary = generateSummary(sbom);
+    const summary = generateSummary(sbom, violations);
     const summaryPath = resolveOutputPath(options.summary, targetPath);
     await writeFile(summaryPath, JSON.stringify(summary, null, 2));
     logger.success(`Summary written to ${summaryPath}`);
 
     // Display results
     displaySummary(summary, logger);
+
+    // Handle violations
+    if (violations.length > 0) {
+      logger.error(`\n❌ Policy violations detected (${violations.length}):`);
+      for (const violation of violations) {
+        logger.error(`   ${violation.component}: ${violation.reason}`);
+      }
+
+      if (options.failOnViolation) {
+        process.exit(1);
+      }
+    } else if (policy) {
+      logger.success("\n✅ All policy checks passed");
+    }
 
     logger.success("Scan completed successfully");
   } catch (error) {
@@ -44,7 +69,7 @@ export async function scanCommand(options: ScanOptions) {
   }
 }
 
-function generateSummary(sbom: any): Summary {
+function generateSummary(sbom: any, violations: any[]): Summary {
   const components = sbom.components || [];
 
   const licenses = {
@@ -64,7 +89,7 @@ function generateSummary(sbom: any): Summary {
     timestamp: new Date().toISOString(),
     components: components.length,
     licenses,
-    violations: [],
+    violations: violations.map((v) => `${v.component}: ${v.reason}`),
   };
 }
 

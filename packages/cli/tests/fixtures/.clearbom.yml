@@ -1,0 +1,7 @@
+version: 1
+
+licenses:
+  deny:
+    - GPL-3.0
+    - AGPL-3.0
+  unknown_action: warn
