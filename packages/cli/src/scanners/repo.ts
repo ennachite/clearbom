@@ -19,7 +19,7 @@ export async function scanRepository(path: string): Promise<CycloneDXBOM> {
 
   try {
     execSync(
-      `npx @cyclonedx/cdxgen@latest -o ${outputPath} -t ${ecosystem} ${path}`,
+      `npx @cyclonedx/cdxgen -o ${outputPath} -t ${ecosystem} ${path}`,
       {
         stdio: "pipe",
         encoding: "utf-8",
