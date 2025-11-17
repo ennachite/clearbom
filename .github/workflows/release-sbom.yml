@@ -1,0 +1,41 @@
+name: SBOM on Release
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  sbom:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js and pnpm
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 8
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build ClearBOM
+        run: pnpm build
+        
+      - name: Generate SBOM
+        uses: ./packages/action
+        with:
+          upload: false
+          version: ${{ github.ref_name }}
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: |
+            sbom.json
+            summary.json

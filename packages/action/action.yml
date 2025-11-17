@@ -1,0 +1,41 @@
+name: 'ClearBOM SBOM Generator'
+description: 'Generate SBOMs and optionally upload to ClearBOM SaaS'
+branding:
+  icon: 'shield'
+  color: 'blue'
+
+inputs:
+  path:
+    description: 'Path to scan (default: .)'
+    default: '.'
+  image:
+    description: 'Container image to scan (optional)'
+    required: false
+  policy:
+    description: 'Path to .clearbom.yml policy file'
+    default: '.clearbom.yml'
+    required: false
+  upload:
+    description: 'Upload SBOM to ClearBOM SaaS (true/false)'
+    default: 'false'
+  token:
+    description: 'ClearBOM API token (required if upload=true)'
+    required: false
+  version:
+    description: 'Release version (default: git tag or SHA)'
+    required: false
+  fail-on-violation:
+    description: 'Fail build on policy violation (true/false)'
+    default: 'true'
+
+outputs:
+  sbom-path:
+    description: 'Path to generated SBOM file'
+  summary-path:
+    description: 'Path to summary JSON'
+  release-url:
+    description: 'ClearBOM release URL (if uploaded)'
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
