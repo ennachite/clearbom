@@ -1,4 +1,3 @@
-// packages/cli/src/scanners/image.ts
 import { execSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
@@ -8,10 +7,15 @@ import type { CycloneDXBOM } from "../types.js";
 
 export function isDockerInstalled(): boolean {
   try {
-    execSync("docker ps", { stdio: "ignore", encoding: "utf-8" });
+    execSync("sudo docker ps", { stdio: "ignore", encoding: "utf-8" });
     return true;
   } catch (error) {
-    return false;
+    try {
+      execSync("docker ps", { stdio: "ignore", encoding: "utf-8" });
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 }
 
@@ -21,8 +25,10 @@ export async function scanImage(imageName: string): Promise<CycloneDXBOM> {
   const tempFile = `clearbom-sbom-${Date.now()}.json`;
   const outputPath = join(tmpdir(), tempFile);
 
+  const dockerCmd = isDockerInstalled() ? "sudo docker" : "docker";
+
   const dockerCommand = [
-    "docker run --rm",
+    `${dockerCmd} run --rm`,
     `-v "${tmpdir()}":/out`,
     `anchore/syft:${syftVersion}`,
     `packages ${imageName}`,

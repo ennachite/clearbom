@@ -16,13 +16,18 @@ function isMvnInstalled(): boolean {
 
 function isDockerRunning(): boolean {
   try {
-    execSync("docker ps", { stdio: "ignore", encoding: "utf-8" });
+    execSync("sudo docker ps", { stdio: "ignore", encoding: "utf-8" });
     return true;
   } catch (error) {
-    console.warn(
-      "WARN: Docker daemon not responsive. Skipping container image scan test."
-    );
-    return false;
+    try {
+      execSync("docker ps", { stdio: "ignore", encoding: "utf-8" });
+      return true;
+    } catch (e) {
+      console.warn(
+        "WARN: Docker daemon not responsive. Skipping container image scan test."
+      );
+      return false;
+    }
   }
 }
 
@@ -91,25 +96,25 @@ describe("clearbom scan", () => {
     "should generate SBOM for a container image",
     async () => {
       const cliPath = join(process.cwd(), "dist/index.js");
-      const sbomPath = join(process.cwd(), "image-sbom.json");
+      const outputPath = join(process.cwd(), "image-sbom.json");
       const summaryPath = join(process.cwd(), "image-summary.json");
 
-      if (existsSync(sbomPath)) execSync(`rm ${sbomPath}`);
+      if (existsSync(outputPath)) execSync(`rm ${outputPath}`);
       if (existsSync(summaryPath)) execSync(`rm ${summaryPath}`);
 
       execSync(
-        `node ${cliPath} scan --image alpine:3.18 --output ${sbomPath} --summary ${summaryPath} --quiet`,
+        `node ${cliPath} scan --image alpine:3.18 --output image-sbom.json --summary image-summary.json --quiet`,
         {
           stdio: "inherit",
         }
       );
 
       // Verify SBOM exists
-      expect(existsSync(sbomPath)).toBe(true);
+      expect(existsSync(outputPath)).toBe(true);
       // Verify Summary exists
       expect(existsSync(summaryPath)).toBe(true);
 
-      const sbomContent = await readFile(sbomPath, "utf-8");
+      const sbomContent = await readFile(outputPath, "utf-8");
       const sbom = JSON.parse(sbomContent);
 
       expect(sbom.bomFormat).toBe("CycloneDX");
@@ -122,7 +127,7 @@ describe("clearbom scan", () => {
       expect(osComponent).toBeDefined();
 
       // Clean up
-      execSync(`rm ${sbomPath}`);
+      execSync(`rm ${outputPath}`);
       execSync(`rm ${summaryPath}`);
     },
     120000
