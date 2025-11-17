@@ -2,12 +2,16 @@ name: SBOM on Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 jobs:
   sbom:
     runs-on: ubuntu-latest
-    
+
+    permissions:
+      contents: read
+      packages: write
+
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -20,22 +24,36 @@ jobs:
         with:
           version: 8
 
+      - name: Set up Java (for mvn)
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Set up Docker
+        uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
       - name: Install dependencies
         run: pnpm install
 
-      - name: Build ClearBOM
+      - name: Build all packages
         run: pnpm build
-        
-      - name: Generate SBOM
+
+      - name: Generate SBOM using local Action
         uses: ./packages/action
+        id: sbom_scan
         with:
+          path: "."
+          image: "alpine:3.18"
           upload: false
+          token: ${{ secrets.CLEARBOM_TOKEN }}
           version: ${{ github.ref_name }}
 
       - name: Upload SBOM artifact
         uses: actions/upload-artifact@v4
         with:
-          name: sbom
+          name: sbom-artifacts
           path: |
-            sbom.json
-            summary.json
+            ${{ steps.sbom_scan.outputs.sbom-path }}
+            ${{ steps.sbom_scan.outputs.summary-path }}
