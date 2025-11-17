@@ -9,7 +9,7 @@ export async function scanRepository(path: string): Promise<CycloneDXBOM> {
   const outputPath = join(path, ".clearbom-temp-sbom.json");
 
   try {
-    execSync(`npx @cyclonedx/cdxgen -o ${outputPath} ${path}`, {
+    execSync(`npx @cyclonedx/cdxgen -o ${outputPath} -r ${path}`, {
       stdio: "pipe",
       encoding: "utf-8",
     });
