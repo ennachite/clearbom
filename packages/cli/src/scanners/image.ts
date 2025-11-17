@@ -2,20 +2,15 @@ import { execSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
+import { tmpdir, userInfo } from "node:os";
 import type { CycloneDXBOM } from "../types.js";
 
 export function isDockerInstalled(): boolean {
   try {
-    execSync("sudo docker ps", { stdio: "ignore", encoding: "utf-8" });
+    execSync("docker ps", { stdio: "ignore", encoding: "utf-8" });
     return true;
   } catch (error) {
-    try {
-      execSync("docker ps", { stdio: "ignore", encoding: "utf-8" });
-      return true;
-    } catch (e) {
-      return false;
-    }
+    return false;
   }
 }
 
@@ -25,10 +20,21 @@ export async function scanImage(imageName: string): Promise<CycloneDXBOM> {
   const tempFile = `clearbom-sbom-${Date.now()}.json`;
   const outputPath = join(tmpdir(), tempFile);
 
-  const dockerCmd = isDockerInstalled() ? "sudo docker" : "docker";
+  let userArgs = "";
+  try {
+    const { uid, gid } = userInfo();
+    // In Windows, uid can be -1. In that case, don't pass the --user arg.
+    // In GitHub Actions (Linux), this will be a valid user (e.g., 1001:121).
+    if (uid !== -1 && gid !== -1) {
+      userArgs = `--user ${uid}:${gid}`;
+    }
+  } catch (e) {
+    // Silently fail if userInfo can't be retrieved
+  }
 
   const dockerCommand = [
-    `${dockerCmd} run --rm`,
+    "docker run --rm",
+    userArgs,
     `-v "${tmpdir()}":/out`,
     `anchore/syft:${syftVersion}`,
     `packages ${imageName}`,

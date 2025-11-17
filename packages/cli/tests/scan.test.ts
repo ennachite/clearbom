@@ -16,18 +16,13 @@ function isMvnInstalled(): boolean {
 
 function isDockerRunning(): boolean {
   try {
-    execSync("sudo docker ps", { stdio: "ignore", encoding: "utf-8" });
+    execSync("docker ps", { stdio: "ignore", encoding: "utf-8" });
     return true;
-  } catch (error) {
-    try {
-      execSync("docker ps", { stdio: "ignore", encoding: "utf-8" });
-      return true;
-    } catch (e) {
-      console.warn(
-        "WARN: Docker daemon not responsive. Skipping container image scan test."
-      );
-      return false;
-    }
+  } catch (e) {
+    console.warn(
+      "WARN: Docker daemon not responsive. Skipping container image scan test."
+    );
+    return false;
   }
 }
 
