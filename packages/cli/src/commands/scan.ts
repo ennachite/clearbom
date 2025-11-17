@@ -2,33 +2,36 @@ import { writeFile } from "node:fs/promises";
 import { isAbsolute, join, resolve } from "node:path";
 import { Logger } from "../utils/logger.js";
 import { scanRepository } from "../scanners/repo.js";
+import { scanImage } from "../scanners/image.js";
 import { categorizeLicense, extractLicenseId } from "../utils/license.js";
 import { loadPolicy } from "../policy/parser.js";
 import { validatePolicy } from "../policy/validator.js";
-import type { ScanOptions, Summary } from "../types.js";
+import type { CycloneDXBOM, ScanOptions, Summary } from "../types.js";
 
 export async function scanCommand(options: ScanOptions) {
   const logger = new Logger(options.quiet);
+  let sbom: CycloneDXBOM;
 
   try {
     logger.info("Starting SBOM generation...");
 
+    const targetPath = resolve(options.path ?? ".");
+
     if (options.image) {
-      logger.error("Container image scanning not yet implemented");
-      process.exit(1);
+      logger.info(`Scanning container image: ${options.image}`);
+      if (options.path && options.path !== '.') {
+        logger.warn("Scanning both an image and a path is not yet fully supported. Scanning image only.");
+      }
+      sbom = await scanImage(options.image);
+    } else {
+      logger.info(`Scanning repository at ${targetPath}`);
+      sbom = await scanRepository(targetPath);
     }
 
-    // Generate SBOM
-    const targetPath = resolve(options.path ?? ".");
-    logger.info(`Scanning repository at ${targetPath}`);
-    const sbom = await scanRepository(targetPath);
-
-    // Write SBOM
     const outputPath = resolveOutputPath(options.output, targetPath);
     await writeFile(outputPath, JSON.stringify(sbom, null, 2));
     logger.success(`SBOM written to ${outputPath}`);
 
-    // Load policy
     const policy = await loadPolicy(options.policy);
     let violations: any[] = [];
 
@@ -69,7 +72,7 @@ export async function scanCommand(options: ScanOptions) {
   }
 }
 
-function generateSummary(sbom: any, violations: any[]): Summary {
+function generateSummary(sbom: CycloneDXBOM, violations: any[]): Summary {
   const components = sbom.components || [];
 
   const licenses = {

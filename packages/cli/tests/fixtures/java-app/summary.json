@@ -1,11 +1,11 @@
 {
-  "timestamp": "2025-11-16T23:04:31.559Z",
-  "components": 0,
+  "timestamp": "2025-11-17T00:32:16.745Z",
+  "components": 2,
   "licenses": {
     "permissive": 0,
     "copyleft": 0,
     "proprietary": 0,
-    "unknown": 0
+    "unknown": 2
   },
   "violations": []
 }
