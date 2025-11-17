@@ -2,7 +2,7 @@ import { execSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { tmpdir, userInfo } from "node:os";
+import { tmpdir, platform } from "node:os";
 import type { CycloneDXBOM } from "../types.js";
 
 export function isDockerInstalled(): boolean {
@@ -18,28 +18,16 @@ export async function scanImage(imageName: string): Promise<CycloneDXBOM> {
   const syftVersion = "v1.10.0";
 
   const tempFile = `clearbom-sbom-${Date.now()}.json`;
-  const outputPath = join(tmpdir(), tempFile);
-
-  let userArgs = "";
-  try {
-    const { uid, gid } = userInfo();
-    // In Windows, uid can be -1. In that case, don't pass the --user arg.
-    // In GitHub Actions (Linux), this will be a valid user (e.g., 1001:121).
-    if (uid !== -1 && gid !== -1) {
-      userArgs = `--user ${uid}:${gid}`;
-    }
-  } catch (e) {
-    // Silently fail if userInfo can't be retrieved
-  }
+  const hostTmp = tmpdir();
+  const outputPath = join(hostTmp, tempFile);
 
   const dockerCommand = [
     "docker run --rm",
-    userArgs,
-    `-v "${tmpdir()}":/out`,
+    "-v /var/run/docker.sock:/var/run/docker.sock",
+    `-v "${hostTmp}":/out`,
     `anchore/syft:${syftVersion}`,
-    `packages ${imageName}`,
-    "-o cyclonedx-json",
-    `--file /out/${tempFile}`,
+    `scan ${imageName}`,
+    `-o /out/${tempFile}`,
   ].join(" ");
 
   try {
@@ -57,8 +45,19 @@ export async function scanImage(imageName: string): Promise<CycloneDXBOM> {
     const sbomContent = await readFile(outputPath, "utf-8");
     const sbom: CycloneDXBOM = JSON.parse(sbomContent);
 
-    // Clean up temp file
-    execSync(`rm -f ${outputPath}`);
+    const isWindows = platform() === "win32";
+    // On Windows, use 'del'. On Linux/macOS, use 'sudo rm' for CI.
+    const rmCmd = isWindows
+      ? `del "${outputPath}"`
+      : `sudo rm -f "${outputPath}"`;
+
+    try {
+      execSync(rmCmd, { stdio: "pipe" });
+    } catch (e: any) {
+      console.warn(
+        `Failed to clean up temp file: ${outputPath}. Error: ${e.message}`
+      );
+    }
 
     return sbom;
   } catch (error) {
