@@ -5,6 +5,7 @@ export const PolicySchema = z.object({
   licenses: z
     .object({
       allow: z.array(z.string()).optional(),
+      warn: z.array(z.string()).optional(),
       deny: z.array(z.string()).optional(),
       unknown_action: z.enum(["allow", "deny", "warn"]).default("warn"),
     })

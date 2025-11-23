@@ -5,7 +5,7 @@ import { scanRepository } from "../scanners/repo.js";
 import { scanImage } from "../scanners/image.js";
 import { categorizeLicense, extractLicenseId } from "../utils/license.js";
 import { loadPolicy } from "../policy/parser.js";
-import { validatePolicy } from "../policy/validator.js";
+import { validatePolicy, Violation } from "../policy/validator.js";
 import type { CycloneDXBOM, ScanOptions, Summary } from "../types.js";
 
 export async function scanCommand(options: ScanOptions) {
@@ -19,8 +19,10 @@ export async function scanCommand(options: ScanOptions) {
 
     if (options.image) {
       logger.info(`Scanning container image: ${options.image}`);
-      if (options.path && options.path !== '.') {
-        logger.warn("Scanning both an image and a path is not yet fully supported. Scanning image only.");
+      if (options.path && options.path !== ".") {
+        logger.warn(
+          "Scanning both an image and a path is not yet fully supported. Scanning image only."
+        );
       }
       sbom = await scanImage(options.image);
     } else {
@@ -32,15 +34,16 @@ export async function scanCommand(options: ScanOptions) {
     await writeFile(outputPath, JSON.stringify(sbom, null, 2));
     logger.success(`SBOM written to ${outputPath}`);
 
+    // Load Policy & Validate
     const policy = await loadPolicy(options.policy);
-    let violations: any[] = [];
+    let violations: Violation[] = [];
 
     if (policy) {
       logger.info(`Validating against policy: ${options.policy}`);
       violations = validatePolicy(sbom, policy);
     }
 
-    // Generate summary
+    // Generate Summary with Risk Analysis
     const summary = generateSummary(sbom, violations);
     const summaryPath = resolveOutputPath(options.summary, targetPath);
     await writeFile(summaryPath, JSON.stringify(summary, null, 2));
@@ -49,21 +52,18 @@ export async function scanCommand(options: ScanOptions) {
     // Display results
     displaySummary(summary, logger);
 
-    // Handle violations
-    if (violations.length > 0) {
-      logger.error(`\n❌ Policy violations detected (${violations.length}):`);
-      for (const violation of violations) {
-        logger.error(`   ${violation.component}: ${violation.reason}`);
-      }
+    const errors = violations.filter((v) => v.severity === "error");
 
-      if (options.failOnViolation) {
-        process.exit(1);
-      }
-    } else if (policy) {
-      logger.success("\n✅ All policy checks passed");
+    if (errors.length > 0 && options.failOnViolation) {
+      logger.error(
+        `\n❌ Scan failed: ${errors.length} critical policy violations.`
+      );
+      process.exit(1);
+    } else if (violations.length > 0) {
+      logger.warn(`\n⚠️ Scan passed with ${violations.length} warnings.`);
+    } else {
+      logger.success("\n✅ No policy violations found.");
     }
-
-    logger.success("Scan completed successfully");
   } catch (error) {
     logger.error(
       `Scan failed: ${error instanceof Error ? error.message : "Unknown error"}`
@@ -72,38 +72,55 @@ export async function scanCommand(options: ScanOptions) {
   }
 }
 
-function generateSummary(sbom: CycloneDXBOM, violations: any[]): Summary {
+function generateSummary(sbom: any, violations: Violation[]): Summary {
   const components = sbom.components || [];
-
-  const licenses = {
-    permissive: 0,
-    copyleft: 0,
-    proprietary: 0,
-    unknown: 0,
-  };
+  const licenses = { permissive: 0, copyleft: 0, proprietary: 0, unknown: 0 };
+  
+  // Calculate Risk Buckets
+  const risk = { red: 0, yellow: 0, green: 0 };
+  
+  // Map component names to violations for easy lookup
+  const violationMap = new Map<string, string>(); // component -> severity
+  violations.forEach(v => violationMap.set(v.component, v.severity));
 
   for (const component of components) {
     const licenseId = extractLicenseId(component);
     const category = categorizeLicense(licenseId);
     licenses[category]++;
+
+    const compName = `${component.name}@${component.version || "unknown"}`;
+    const severity = violationMap.get(compName);
+
+    if (severity === 'error') {
+        risk.red++;
+    } else if (severity === 'warning') {
+        risk.yellow++;
+    } else {
+        risk.green++;
+    }
   }
 
   return {
     timestamp: new Date().toISOString(),
     components: components.length,
     licenses,
-    violations: violations.map((v) => `${v.component}: ${v.reason}`),
+    risk,
+    violations: violations.map(v => ({
+        component: v.component,
+        reason: v.reason,
+        severity: v.severity
+    })),
   };
 }
 
 function displaySummary(summary: Summary, logger: Logger) {
   logger.info(`\n📊 Summary:`);
   logger.info(`   Components: ${summary.components}`);
-  logger.info(`   Licenses:`);
-  logger.info(`     Permissive: ${summary.licenses.permissive}`);
-  logger.info(`     Copyleft: ${summary.licenses.copyleft}`);
-  logger.info(`     Proprietary: ${summary.licenses.proprietary}`);
-  logger.info(`     Unknown: ${summary.licenses.unknown}`);
+  
+  logger.info(`   Risk Analysis:`);
+  if (summary.risk.red > 0) logger.error(`     🔴 Critical (Red): ${summary.risk.red}`);
+  if (summary.risk.yellow > 0) logger.warn(`     🟡 Warning (Yellow): ${summary.risk.yellow}`);
+  logger.success(`     🟢 Safe (Green): ${summary.risk.green}`);
 }
 
 function resolveOutputPath(path: string, basePath: string) {

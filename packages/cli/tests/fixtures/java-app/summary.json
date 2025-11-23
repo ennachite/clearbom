@@ -1,11 +1,16 @@
 {
-  "timestamp": "2025-11-17T02:30:00.094Z",
+  "timestamp": "2025-11-23T23:14:52.497Z",
   "components": 2,
   "licenses": {
     "permissive": 0,
     "copyleft": 0,
     "proprietary": 0,
     "unknown": 2
+  },
+  "risk": {
+    "red": 0,
+    "yellow": 0,
+    "green": 2
   },
   "violations": []
 }

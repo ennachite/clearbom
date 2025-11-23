@@ -47,5 +47,10 @@ export interface Summary {
     proprietary: number;
     unknown: number;
   };
-  violations: string[];
+  risk: { 
+    red: number;
+    yellow: number;
+    green: number; 
+  };
+  violations: Array<{ component: string; reason: string; severity: string }>;
 }

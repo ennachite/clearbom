@@ -6,6 +6,7 @@ export interface Violation {
   component: string;
   license: string;
   reason: string;
+  severity: "error" | "warning";
 }
 
 export function validatePolicy(
@@ -18,41 +19,53 @@ export function validatePolicy(
 
   const violations: Violation[] = [];
   const components = sbom.components || [];
+  const { deny = [], warn = [], allow = [] } = policy.licenses;
 
   for (const component of components) {
     const licenseId = extractLicenseId(component);
+    const compName = `${component.name}@${component.version || "unknown"}`;
 
-    // Check deny list
-    if (
-      policy.licenses.deny &&
-      licenseId &&
-      policy.licenses.deny.includes(licenseId)
-    ) {
+    if (licenseId && deny.includes(licenseId)) {
       violations.push({
-        component: `${component.name}@${component.version || "unknown"}`,
+        component: compName,
         license: licenseId,
-        reason: `License ${licenseId} is denied by policy`,
+        reason: `License ${licenseId} is in the deny list`,
+        severity: "error",
+      });
+      continue;
+    }
+
+    if (licenseId && warn.includes(licenseId)) {
+      violations.push({
+        component: compName,
+        license: licenseId,
+        reason: `License ${licenseId} flagged for review`,
+        severity: "warning",
       });
     }
 
-    // Check allow list (if specified, only allowed licenses are permitted)
-    if (policy.licenses.allow && policy.licenses.allow.length > 0) {
-      if (!licenseId || !policy.licenses.allow.includes(licenseId)) {
-        violations.push({
-          component: `${component.name}@${component.version || "unknown"}`,
-          license: licenseId || "UNKNOWN",
-          reason: `License ${licenseId || "UNKNOWN"} is not in allow list`,
-        });
+    if (allow.length > 0) {
+      if (!licenseId || !allow.includes(licenseId)) {
+         const isWarned = violations.some(v => v.component === compName && v.severity === 'warning');
+         if (!isWarned) {
+             violations.push({
+                component: compName,
+                license: licenseId || "UNKNOWN",
+                reason: `License ${licenseId || "UNKNOWN"} is not in allow list`,
+                severity: "error", 
+             });
+         }
       }
     }
-
-    // Handle unknown licenses
-    if (!licenseId && policy.licenses.unknown_action === "deny") {
-      violations.push({
-        component: `${component.name}@${component.version || "unknown"}`,
-        license: "UNKNOWN",
-        reason: "Unknown license detected and policy denies unknowns",
-      });
+    
+    if (!licenseId && policy.licenses.unknown_action !== 'allow') {
+        const severity = policy.licenses.unknown_action === 'deny' ? 'error' : 'warning';
+        violations.push({
+            component: compName,
+            license: "UNKNOWN",
+            reason: "Unknown license detected",
+            severity
+        });
     }
   }
 
