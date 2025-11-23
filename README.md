@@ -18,8 +18,6 @@ Install the command-line tool globally from NPM:
 npm install -g clearbom
 ```
 
-*(Note: This assumes your package is published with the name `clearbom`, as specified in your `package.json`).*
-
 **Prerequisites:**
 
   * **Node.js:** v20 or newer
