@@ -2,6 +2,7 @@ import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as github from "@actions/github";
 import { join } from "node:path";
+import { existsSync } from "node:fs";
 
 async function run() {
   try {
@@ -12,6 +13,7 @@ async function run() {
     const path = core.getInput("path");
     const image = core.getInput("image");
     const policy = core.getInput("policy");
+    const markdownReport = core.getInput("markdown-report");
     const shouldUpload = core.getInput("upload") === "true";
     const token = core.getInput("token");
     let version = core.getInput("version");
@@ -27,6 +29,10 @@ async function run() {
 
     if (policy) {
       scanCommand += ` --policy "${policy}"`;
+    }
+
+    if (markdownReport) {
+      scanCommand += ` --markdown "${markdownReport}"`;
     }
 
     if (!failOnViolation) {
@@ -62,6 +68,19 @@ async function run() {
 
     core.setOutput("sbom-path", sbomPath);
     core.setOutput("summary-path", summaryPath);
+    
+    if (markdownReport && existsSync(markdownReport)) {
+      core.setOutput("report-path", markdownReport);
+      await exec.exec(`cat ${markdownReport}`, [], {
+        listeners: {
+          stdout: (data: Buffer) => {
+            core.summary.addRaw(data.toString());
+          }
+        }
+      });
+      await core.summary.write();
+    }
+
   } catch (error) {
     if (error instanceof Error) {
       core.setFailed(error.message);

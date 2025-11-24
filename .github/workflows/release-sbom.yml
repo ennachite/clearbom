@@ -47,13 +47,14 @@ jobs:
           path: "."
           image: "alpine:3.18"
           upload: false
-          token: ${{ secrets.CLEARBOM_TOKEN }}
+          markdown-report: "clearbom-report.md"
           version: ${{ github.ref_name }}
 
-      - name: Upload SBOM artifact
+      - name: Upload SBOM artifacts
         uses: actions/upload-artifact@v4
         with:
           name: sbom-artifacts
           path: |
             ${{ steps.sbom_scan.outputs.sbom-path }}
             ${{ steps.sbom_scan.outputs.summary-path }}
+            ${{ steps.sbom_scan.outputs.report-path }}
