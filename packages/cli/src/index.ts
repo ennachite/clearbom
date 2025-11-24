@@ -20,7 +20,12 @@ program
   .option('--policy <file>', 'Policy file path', '.clearbom.yml')
   .option('--summary <file>', 'Summary output path', 'summary.json')
   .option('--fail-on-violation', 'Exit 1 on policy violation', true)
+  .option(
+    '--no-fail-on-violation',
+    'Do not exit with status 1 when policy violations are found'
+  )
   .option('--quiet', 'Suppress output', false)
+  .option('--markdown <file>', 'Output summary as Markdown (e.g. report.md)')
   .action(scanCommand);
 
 program

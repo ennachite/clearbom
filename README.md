@@ -57,11 +57,8 @@ Fail the scan if licenses denied in your policy file are found.
 clearbom scan --policy ./.clearbom.yml
 ```
 
-To prevent the scan from failing (e.g., just for reporting), use:
-
-```bash
-clearbom scan --policy ./.clearbom.yml --no-fail-on-violation
-```
+By default the CLI exits with code 1 when violations are found. To allow the scan
+to succeed (useful for reporting-only runs), add `--no-fail-on-violation`.
 
 ### Specify Output Files
 
@@ -70,6 +67,15 @@ Customize the output file paths.
 ```bash
 clearbom scan --path ./my-app --output my-app-sbom.json --summary my-app-summary.json
 ```
+
+### Generate a Markdown Report
+
+Produce a human-readable Markdown summary alongside the JSON outputs:
+
+```bash
+clearbom scan --path ./my-app --policy ./.clearbom.yml --markdown report.md
+```
+The flag respects `--fail-on-violation` / `--no-fail-on-violation` just like JSON outputs.
 
 ### Check Version
 

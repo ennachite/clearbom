@@ -60,12 +60,15 @@ export function validatePolicy(
     
     if (!licenseId && policy.licenses.unknown_action !== 'allow') {
         const severity = policy.licenses.unknown_action === 'deny' ? 'error' : 'warning';
-        violations.push({
-            component: compName,
-            license: "UNKNOWN",
-            reason: "Unknown license detected",
-            severity
-        });
+        const alreadyReported = violations.some(v => v.component === compName);
+        if (!alreadyReported) {
+            violations.push({
+                component: compName,
+                license: "UNKNOWN",
+                reason: "Unknown license detected",
+                severity
+            });
+        }
     }
   }
 

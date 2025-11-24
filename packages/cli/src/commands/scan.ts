@@ -5,7 +5,8 @@ import { scanRepository } from "../scanners/repo.js";
 import { scanImage } from "../scanners/image.js";
 import { categorizeLicense, extractLicenseId } from "../utils/license.js";
 import { loadPolicy } from "../policy/parser.js";
-import { validatePolicy, Violation } from "../policy/validator.js";
+import { validatePolicy, type Violation } from "../policy/validator.js";
+import { toMarkdown } from "../utils/formatter.js";
 import type { CycloneDXBOM, ScanOptions, Summary } from "../types.js";
 
 export async function scanCommand(options: ScanOptions) {
@@ -14,7 +15,6 @@ export async function scanCommand(options: ScanOptions) {
 
   try {
     logger.info("Starting SBOM generation...");
-
     const targetPath = resolve(options.path ?? ".");
 
     if (options.image) {
@@ -34,7 +34,6 @@ export async function scanCommand(options: ScanOptions) {
     await writeFile(outputPath, JSON.stringify(sbom, null, 2));
     logger.success(`SBOM written to ${outputPath}`);
 
-    // Load Policy & Validate
     const policy = await loadPolicy(options.policy);
     let violations: Violation[] = [];
 
@@ -43,11 +42,18 @@ export async function scanCommand(options: ScanOptions) {
       violations = validatePolicy(sbom, policy);
     }
 
-    // Generate Summary with Risk Analysis
     const summary = generateSummary(sbom, violations);
+
     const summaryPath = resolveOutputPath(options.summary, targetPath);
     await writeFile(summaryPath, JSON.stringify(summary, null, 2));
     logger.success(`Summary written to ${summaryPath}`);
+
+    if (options.markdown) {
+      const mdContent = toMarkdown(summary);
+      const mdPath = resolveOutputPath(options.markdown, targetPath);
+      await writeFile(mdPath, mdContent);
+      logger.success(`Report written to ${mdPath}`);
+    }
 
     // Display results
     displaySummary(summary, logger);
@@ -75,13 +81,12 @@ export async function scanCommand(options: ScanOptions) {
 function generateSummary(sbom: any, violations: Violation[]): Summary {
   const components = sbom.components || [];
   const licenses = { permissive: 0, copyleft: 0, proprietary: 0, unknown: 0 };
-  
-  // Calculate Risk Buckets
   const risk = { red: 0, yellow: 0, green: 0 };
-  
-  // Map component names to violations for easy lookup
-  const violationMap = new Map<string, string>(); // component -> severity
-  violations.forEach(v => violationMap.set(v.component, v.severity));
+
+  const violationMap = new Map<string, string>();
+  for (const v of violations) {
+    violationMap.set(v.component, v.severity);
+  }
 
   for (const component of components) {
     const licenseId = extractLicenseId(component);
@@ -91,12 +96,12 @@ function generateSummary(sbom: any, violations: Violation[]): Summary {
     const compName = `${component.name}@${component.version || "unknown"}`;
     const severity = violationMap.get(compName);
 
-    if (severity === 'error') {
-        risk.red++;
-    } else if (severity === 'warning') {
-        risk.yellow++;
+    if (severity === "error") {
+      risk.red++;
+    } else if (severity === "warning") {
+      risk.yellow++;
     } else {
-        risk.green++;
+      risk.green++;
     }
   }
 
@@ -105,10 +110,10 @@ function generateSummary(sbom: any, violations: Violation[]): Summary {
     components: components.length,
     licenses,
     risk,
-    violations: violations.map(v => ({
-        component: v.component,
-        reason: v.reason,
-        severity: v.severity
+    violations: violations.map((v) => ({
+      component: v.component,
+      reason: v.reason,
+      severity: v.severity,
     })),
   };
 }
@@ -116,11 +121,12 @@ function generateSummary(sbom: any, violations: Violation[]): Summary {
 function displaySummary(summary: Summary, logger: Logger) {
   logger.info(`\n📊 Summary:`);
   logger.info(`   Components: ${summary.components}`);
-  
   logger.info(`   Risk Analysis:`);
-  if (summary.risk.red > 0) logger.error(`     🔴 Critical (Red): ${summary.risk.red}`);
-  if (summary.risk.yellow > 0) logger.warn(`     🟡 Warning (Yellow): ${summary.risk.yellow}`);
-  logger.success(`     🟢 Safe (Green): ${summary.risk.green}`);
+  if (summary.risk.red > 0)
+    logger.error(`     🔴 Critical: ${summary.risk.red}`);
+  if (summary.risk.yellow > 0)
+    logger.warn(`     🟡 Warning:  ${summary.risk.yellow}`);
+  logger.success(`     🟢 Safe:     ${summary.risk.green}`);
 }
 
 function resolveOutputPath(path: string, basePath: string) {

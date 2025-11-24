@@ -34,6 +34,7 @@ export interface ScanOptions {
   output: string;
   policy: string;
   summary: string;
+  markdown?: string;
   failOnViolation: boolean;
   quiet: boolean;
 }
@@ -47,10 +48,10 @@ export interface Summary {
     proprietary: number;
     unknown: number;
   };
-  risk: { 
+  risk: {
     red: number;
     yellow: number;
-    green: number; 
+    green: number;
   };
   violations: Array<{ component: string; reason: string; severity: string }>;
 }

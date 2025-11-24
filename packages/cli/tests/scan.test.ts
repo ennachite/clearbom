@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { execSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 function isMvnInstalled(): boolean {
@@ -53,7 +53,6 @@ async function runScanTest(fixtureName: string, componentName: string) {
 
   expect(sbom.bomFormat).toBe("CycloneDX");
   expect(["1.5", "1.6"]).toContain(sbom.specVersion);
-  expect(sbom.components).toBeDefined();
   expect(sbom.components.length).toBeGreaterThan(0);
 
   // Verify a key component is in the list
@@ -86,6 +85,49 @@ describe("clearbom scan", () => {
     90000
   );
 
+  // NEW: Test Risk Analysis & Markdown
+  it("should generate risk analysis and markdown report", async () => {
+    const fixturePath = join(process.cwd(), "tests/fixtures/node-app");
+    const policyPath = join(fixturePath, "risk-policy.yml");
+    const mdPath = join(fixturePath, "risk-report.md");
+    const sbomPath = join(fixturePath, "risk-sbom.json");
+    const summaryPath = join(fixturePath, "risk-summary.json");
+
+    // Define a policy that warns on MIT licenses
+    const policyContent = `
+version: 1
+licenses:
+  warn:
+    - MIT
+  unknown_action: allow
+`;
+    await writeFile(policyPath, policyContent);
+
+    const cliPath = join(process.cwd(), "dist/index.js");
+
+    // Run scan with policy and markdown output
+    execSync(
+      `node ${cliPath} scan --path ${fixturePath} --policy ${policyPath} --markdown ${mdPath} --output ${sbomPath} --summary ${summaryPath} --no-fail-on-violation --quiet`,
+      { stdio: "inherit" }
+    );
+
+    // Verify Summary JSON Risk Counts
+    const summary = JSON.parse(await readFile(summaryPath, "utf-8"));
+    // Node-app uses express (MIT), so we expect warnings
+    expect(summary.risk.yellow).toBeGreaterThan(0);
+    expect(summary.risk.red).toBe(0);
+
+    // Verify Markdown Report
+    expect(existsSync(mdPath)).toBe(true);
+    const mdContent = await readFile(mdPath, "utf-8");
+    expect(mdContent).toContain("# 🟡 ClearBOM Security Report");
+    expect(mdContent).toContain("| Metric | Count | Status |");
+    expect(mdContent).toContain("🟡 Warning");
+
+    // Cleanup
+    execSync(`rm ${policyPath} ${mdPath} ${sbomPath} ${summaryPath}`);
+  }, 100000);
+
   // Container Image Scanning Test
   it.skipIf(!hasDocker)(
     "should generate SBOM for a container image",
@@ -99,9 +141,7 @@ describe("clearbom scan", () => {
 
       execSync(
         `node ${cliPath} scan --image alpine:3.18 --output image-sbom.json --summary image-summary.json --quiet`,
-        {
-          stdio: "inherit",
-        }
+        { stdio: "inherit" }
       );
 
       // Verify SBOM exists
